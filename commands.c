@@ -264,6 +264,36 @@ void executeCommands(char *command)
             }
         }
     }
+    else if (strcmp(tokens[0], "rm") == 0) {
+        if (token_count < 2) {
+            fprintf(output, "Error: rm command requires a file or directory name argument\n");
+        } else {
+            struct stat path_stat;
+            
+            // Check if path exists and get its type
+            if (stat(tokens[1], &path_stat) == -1) {
+                fprintf(output, "Error: '%s' does not exist\n", tokens[1]);
+            } else {
+                if (S_ISDIR(path_stat.st_mode)) {
+                    // It's a directory, try to remove it (will only work if empty)
+                    if (rmdir(tokens[1]) != 0) {
+                        if (errno == ENOTEMPTY) {
+                            fprintf(output, "Error: Directory '%s' is not empty\n", tokens[1]);
+                        } else {
+                            fprintf(output, "Error: Could not remove directory '%s': %s\n",
+                                    tokens[1], strerror(errno));
+                        }
+                    }
+                } else {
+                    // It's a regular file or link, try to unlink it
+                    if (unlink(tokens[1]) != 0) {
+                        fprintf(output, "Error: Could not remove '%s': %s\n",
+                                tokens[1], strerror(errno));
+                    }
+                }
+            }
+        }
+    }
     else {
         fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
     }
