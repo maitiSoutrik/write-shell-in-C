@@ -233,6 +233,37 @@ void executeCommands(char *command)
             closedir(dir);
         }
     }
+    else if (strcmp(tokens[0], "mkdir") == 0) {
+        if (token_count < 2) {
+            fprintf(output, "Error: mkdir command requires a directory name argument\n");
+        } else {
+            // Create directory with standard permissions (rwxr-xr-x)
+            if (mkdir(tokens[1], 0755) != 0) {
+                fprintf(output, "Error: Could not create directory '%s': %s\n",
+                        tokens[1], strerror(errno));
+            }
+        }
+    }
+    else if (strcmp(tokens[0], "touch") == 0) {
+        if (token_count < 2) {
+            fprintf(output, "Error: touch command requires a file name argument\n");
+        } else {
+            // Try to open the file in append mode, create if it doesn't exist
+            int fd = open(tokens[1], O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd == -1) {
+                fprintf(output, "Error: Could not create file '%s': %s\n",
+                        tokens[1], strerror(errno));
+            } else {
+                // Update the access and modification times
+                struct timespec times[2] = {{0, UTIME_NOW}, {0, UTIME_NOW}};
+                if (futimens(fd, times) == -1) {
+                    fprintf(output, "Warning: Could not update timestamps for '%s': %s\n",
+                            tokens[1], strerror(errno));
+                }
+                close(fd);
+            }
+        }
+    }
     else {
         fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
     }
