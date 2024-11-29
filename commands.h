@@ -14,8 +14,14 @@
 #include <signal.h>
 #include <time.h>
 
-// Add preprocessor directives here
+#define MAX_TOKENS 64
+#define MAX_TOKEN_LENGTH 256
+#define DELIMITERS " \t\r\n\a"
 
+// Function declarations
 void executeCommands(char *command);
+char** tokenizeCommand(char *command, int *token_count);
+FILE* checkRedirection(char **tokens, int *token_count);
+void freeTokens(char **tokens, int token_count);
 
 #endif
