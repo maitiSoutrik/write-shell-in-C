@@ -1,0 +1,14 @@
+# Binary
+edsh
+
+# Object files
+*.o
+
+# Debug files
+*.dSYM/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
