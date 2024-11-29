@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <limits.h>
 
 #define MAX_TOKENS 64
 #define MAX_TOKEN_LENGTH 256

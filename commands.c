@@ -122,6 +122,28 @@ void executeCommands(char *command)
             }
         }
     }
+    else if (strcmp(tokens[0], "pwd") == 0) {
+        char cwd[PATH_MAX];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            fprintf(output, "%s\n", cwd);
+        } else {
+            fprintf(output, "Error: Could not get current directory\n");
+        }
+    }
+    else if (strcmp(tokens[0], "cd") == 0) {
+        const char *dir;
+        if (token_count < 2) {
+            // No argument provided, change to home directory
+            dir = "/Users/soutrikmaiti/Documents/git_repos/write-shell-in-C";
+        } else {
+            dir = tokens[1];
+        }
+        
+        if (chdir(dir) != 0) {
+            fprintf(output, "Error: Could not change directory to '%s': %s\n", 
+                    dir, strerror(errno));
+        }
+    }
     else {
         fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
     }
