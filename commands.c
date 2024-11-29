@@ -1,4 +1,5 @@
 #include "commands.h"
+#include <sys/stat.h>
 
 // Function to tokenize the command string
 char** tokenizeCommand(char *command, int *token_count) {
@@ -95,6 +96,31 @@ void executeCommands(char *command)
             }
         }
         fprintf(output, "\n");  // Add newline at the end
+    }
+    else if (strcmp(tokens[0], "cat") == 0) {
+        if (token_count < 2) {
+            fprintf(output, "Error: cat command requires a file argument\n");
+        } else {
+            // Check if file exists and is a regular file
+            struct stat file_stat;
+            if (stat(tokens[1], &file_stat) == -1) {
+                fprintf(output, "Error: File '%s' does not exist\n", tokens[1]);
+            } else if (!S_ISREG(file_stat.st_mode)) {
+                fprintf(output, "Error: '%s' is not a regular file\n", tokens[1]);
+            } else {
+                // Open and read the file
+                FILE *file = fopen(tokens[1], "r");
+                if (!file) {
+                    fprintf(output, "Error: Cannot open file '%s'\n", tokens[1]);
+                } else {
+                    char buffer[1024];
+                    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+                        fprintf(output, "%s", buffer);
+                    }
+                    fclose(file);
+                }
+            }
+        }
     }
     else {
         fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
