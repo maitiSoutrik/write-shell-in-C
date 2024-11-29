@@ -1,5 +1,4 @@
 #include "commands.h"
-#include <sys/stat.h>
 
 // Function to tokenize the command string
 char** tokenizeCommand(char *command, int *token_count) {
@@ -60,6 +59,27 @@ void freeTokens(char **tokens, int token_count) {
         free(tokens[i]);
     }
     free(tokens);
+}
+
+// Helper function to format file permissions
+void format_permissions(mode_t mode, char *perms) {
+    perms[0] = (S_ISDIR(mode)) ? 'd' : '-';
+    perms[1] = (mode & S_IRUSR) ? 'r' : '-';
+    perms[2] = (mode & S_IWUSR) ? 'w' : '-';
+    perms[3] = (mode & S_IXUSR) ? 'x' : '-';
+    perms[4] = (mode & S_IRGRP) ? 'r' : '-';
+    perms[5] = (mode & S_IWGRP) ? 'w' : '-';
+    perms[6] = (mode & S_IXGRP) ? 'x' : '-';
+    perms[7] = (mode & S_IROTH) ? 'r' : '-';
+    perms[8] = (mode & S_IWOTH) ? 'w' : '-';
+    perms[9] = (mode & S_IXOTH) ? 'x' : '-';
+    perms[10] = '\0';
+}
+
+// Helper function to format file time
+void format_time(time_t time, char *time_str) {
+    struct tm *tm_info = localtime(&time);
+    strftime(time_str, 20, "%b %d %H:%M", tm_info);
 }
 
 void executeCommands(char *command)
@@ -142,6 +162,75 @@ void executeCommands(char *command)
         if (chdir(dir) != 0) {
             fprintf(output, "Error: Could not change directory to '%s': %s\n", 
                     dir, strerror(errno));
+        }
+    }
+    else if (strcmp(tokens[0], "ls") == 0) {
+        DIR *dir;
+        struct dirent *entry;
+        int use_long_format = 0;
+        const char *target_dir = ".";  // Default to current directory
+
+        // Check for -l flag and directory argument
+        for (int i = 1; i < token_count; i++) {
+            if (strcmp(tokens[i], "-l") == 0) {
+                use_long_format = 1;
+            } else {
+                target_dir = tokens[i];
+            }
+        }
+
+        dir = opendir(target_dir);
+        if (dir == NULL) {
+            fprintf(output, "Error: Could not open directory '%s': %s\n", 
+                    target_dir, strerror(errno));
+        } else {
+            if (use_long_format) {
+                // Print total block count
+                long total = 0;
+                while ((entry = readdir(dir)) != NULL) {
+                    struct stat st;
+                    char full_path[PATH_MAX];
+                    snprintf(full_path, sizeof(full_path), "%s/%s", target_dir, entry->d_name);
+                    if (stat(full_path, &st) == 0) {
+                        total += st.st_blocks;
+                    }
+                }
+                fprintf(output, "total %ld\n", total / 2);  // Convert to 1K blocks
+                rewinddir(dir);
+
+                // Print detailed listing
+                while ((entry = readdir(dir)) != NULL) {
+                    char full_path[PATH_MAX];
+                    struct stat st;
+                    snprintf(full_path, sizeof(full_path), "%s/%s", target_dir, entry->d_name);
+                    
+                    if (stat(full_path, &st) == 0) {
+                        char perms[11];
+                        char time_str[20];
+                        struct passwd *pw = getpwuid(st.st_uid);
+                        struct group *gr = getgrgid(st.st_gid);
+                        
+                        format_permissions(st.st_mode, perms);
+                        format_time(st.st_mtime, time_str);
+                        
+                        fprintf(output, "%s %3lu %-8s %-8s %8lld %s %s\n",
+                                perms,
+                                (unsigned long)st.st_nlink,
+                                pw ? pw->pw_name : "unknown",
+                                gr ? gr->gr_name : "unknown",
+                                (long long)st.st_size,
+                                time_str,
+                                entry->d_name);
+                    }
+                }
+            } else {
+                // Simple listing
+                while ((entry = readdir(dir)) != NULL) {
+                    fprintf(output, "%s  ", entry->d_name);
+                }
+                fprintf(output, "\n");
+            }
+            closedir(dir);
         }
     }
     else {
