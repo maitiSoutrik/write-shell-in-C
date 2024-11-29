@@ -380,7 +380,40 @@ void executeCommands(char *command)
         }
     }
     else {
-        fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
+        // Try to execute the command as an external program
+        pid_t pid = fork();
+        
+        if (pid == -1) {
+            // Fork failed
+            fprintf(output, "Error: Failed to create child process: %s\n", strerror(errno));
+        } else if (pid == 0) {
+            // Child process
+            
+            // If output was redirected to a file, redirect stdout
+            if (output != stdout) {
+                if (dup2(fileno(output), STDOUT_FILENO) == -1) {
+                    fprintf(stderr, "Error: Failed to redirect output: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                fclose(output);  // Close the file descriptor as it's no longer needed
+            }
+            
+            // Execute the command
+            execvp(tokens[0], tokens);
+            
+            // If execvp returns, it means it failed
+            fprintf(stderr, "Error: Failed to execute '%s': %s\n", tokens[0], strerror(errno));
+            exit(EXIT_FAILURE);
+        } else {
+            // Parent process
+            int status;
+            waitpid(pid, &status, 0);
+            
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                fprintf(output, "Program '%s' exited with status %d\n", 
+                        tokens[0], WEXITSTATUS(status));
+            }
+        }
     }
 
     freeTokens(tokens, token_count);
