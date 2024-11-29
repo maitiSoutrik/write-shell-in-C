@@ -86,6 +86,16 @@ void executeCommands(char *command)
             fprintf(output, "\033[H\033[J");
         }
     }
+    else if (strcmp(tokens[0], "echo") == 0) {
+        // Print each argument after "echo", separated by spaces
+        for (int i = 1; i < token_count; i++) {
+            fprintf(output, "%s", tokens[i]);
+            if (i < token_count - 1) {
+                fprintf(output, " ");  // Add space between words, but not after last word
+            }
+        }
+        fprintf(output, "\n");  // Add newline at the end
+    }
     else {
         fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
     }
