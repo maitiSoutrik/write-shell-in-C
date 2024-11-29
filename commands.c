@@ -294,6 +294,91 @@ void executeCommands(char *command)
             }
         }
     }
+    else if (strcmp(tokens[0], "mv") == 0) {
+        if (token_count < 3) {
+            fprintf(output, "Error: mv command requires source and destination arguments\n");
+            fprintf(output, "Usage: mv source destination\n");
+        } else {
+            struct stat src_stat, dest_stat;
+            char dest_path[PATH_MAX];
+            int dest_exists = (stat(tokens[2], &dest_stat) == 0);
+            
+            // Check if source exists
+            if (stat(tokens[1], &src_stat) == -1) {
+                fprintf(output, "Error: Source '%s' does not exist\n", tokens[1]);
+                return;
+            }
+            
+            // Determine the full destination path
+            if (dest_exists && S_ISDIR(dest_stat.st_mode)) {
+                // If destination is a directory, append source filename
+                const char *src_name = strrchr(tokens[1], '/');
+                src_name = src_name ? src_name + 1 : tokens[1];
+                snprintf(dest_path, sizeof(dest_path), "%s/%s", tokens[2], src_name);
+            } else {
+                strncpy(dest_path, tokens[2], sizeof(dest_path) - 1);
+                dest_path[sizeof(dest_path) - 1] = '\0';
+            }
+            
+            // Check if source and destination are the same
+            if (strcmp(tokens[1], dest_path) == 0) {
+                fprintf(output, "Error: Source and destination are the same file\n");
+                return;
+            }
+            
+            // Perform the move operation
+            if (rename(tokens[1], dest_path) != 0) {
+                // If rename fails, try to handle cross-device moves for regular files
+                if (errno == EXDEV && S_ISREG(src_stat.st_mode)) {
+                    // Cross-device move: need to copy and delete
+                    FILE *src = fopen(tokens[1], "rb");
+                    if (!src) {
+                        fprintf(output, "Error: Could not open source file '%s': %s\n",
+                                tokens[1], strerror(errno));
+                        return;
+                    }
+                    
+                    FILE *dest = fopen(dest_path, "wb");
+                    if (!dest) {
+                        fclose(src);
+                        fprintf(output, "Error: Could not create destination file '%s': %s\n",
+                                dest_path, strerror(errno));
+                        return;
+                    }
+                    
+                    // Copy the file contents
+                    char buffer[8192];
+                    size_t bytes;
+                    while ((bytes = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+                        if (fwrite(buffer, 1, bytes, dest) != bytes) {
+                            fprintf(output, "Error: Failed to write to destination file '%s': %s\n",
+                                    dest_path, strerror(errno));
+                            fclose(src);
+                            fclose(dest);
+                            unlink(dest_path);  // Clean up partial file
+                            return;
+                        }
+                    }
+                    
+                    // Preserve file permissions
+                    fchmod(fileno(dest), src_stat.st_mode);
+                    
+                    // Close files
+                    fclose(src);
+                    fclose(dest);
+                    
+                    // Remove source file
+                    if (unlink(tokens[1]) != 0) {
+                        fprintf(output, "Warning: Moved file but could not remove source '%s': %s\n",
+                                tokens[1], strerror(errno));
+                    }
+                } else {
+                    fprintf(output, "Error: Could not move '%s' to '%s': %s\n",
+                            tokens[1], dest_path, strerror(errno));
+                }
+            }
+        }
+    }
     else {
         fprintf(output, "Error: Command '%s' not found\n", tokens[0]);
     }
